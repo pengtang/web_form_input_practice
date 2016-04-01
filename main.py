@@ -99,9 +99,25 @@ form = """
 	<br>
 	<br>
 	<input type="submit">
+	<a href="/rot13"> click here </a>
 </form>
 """
-s = "haha"
+
+form_rot13 = """
+<form method="post">
+
+    <h2>Enter some text to ROT13:</h2>
+      <!input name="text" value="%(text)s">
+      <textarea name="text" style="height: 100px; width: 400px;" >%(text)s</textarea>
+      <br>
+      <br>
+      <input type="submit">
+
+</form>
+
+"""
+
+
 class MainHandler(webapp2.RequestHandler):
 	def write_form(self, error="", month="", day="", year=""):
 		self.response.write(form % {"error" : error,
@@ -131,8 +147,44 @@ class ThanksHandler(webapp2.RequestHandler):
 	def get(self):
 		self.response.write("Thanks, that's a valid date")
 
+class Rot13Handler(webapp2.RequestHandler):
+	def rot13(self, s):
+		if not s:
+			return ""
+		new_s = ""
+		for c in s:
+			if c >= 'a' and c <= 'z':
+				#if in half, + 13, otherwise chr(ord('a') + (ord('z') - ord(c)))
+				if c <= 'm':
+					new_s += chr(ord(c) + 13)
+				else:
+					new_s += chr(ord('a') + (ord(c) - ord('n')))
+			elif c >= 'A' and c <= 'Z': 
+				if c <= 'M':
+					new_s += chr(ord(c) + 13)
+				else:
+					new_s += chr(ord('A') + (ord(c) - ord('N')))
+			else:
+				new_s += c		
+		return new_s		
+	
+	def write_form(self, text=""):
+		#print escape_html(self.rot13(text))
+		self.response.write(form_rot13 % {"text":escape_html(self.rot13(text))} )
+
+	
+	def get(self):
+	# will only be invoked first time, with text_to_rot to empty string
+		self.write_form()
+	
+	def post(self):
+	# will run everytime submit is clicked
+		text = self.request.get("text")
+		self.write_form(text)
+
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
-    ('/thanks', ThanksHandler) 
+    ('/thanks', ThanksHandler), 
+    ('/rot13', Rot13Handler)
 #    ('/testform', TestHandler)
 ], debug=True)
