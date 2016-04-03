@@ -17,6 +17,7 @@
 import webapp2
 import cgi
 
+import re
 # form = """
 # <form method="post" action="/testform">
 # 	<input name="q">
@@ -96,10 +97,11 @@ form = """
 	<label> year <input name="year" value="%(year)s">  </label>
 	<div style="color: red">%(error)s</div>
 
-	<br>
-	<br>
 	<input type="submit">
-	<a href="/rot13"> click here </a>
+	<br>
+	<a href="/rot13"> click here for rot13 </a>
+	<br>
+	<a href="signup"> click here for signup </a>
 </form>
 """
 
@@ -107,16 +109,37 @@ form_rot13 = """
 <form method="post">
 
     <h2>Enter some text to ROT13:</h2>
-      <!input name="text" value="%(text)s">
-      <textarea name="text" style="height: 100px; width: 400px;" >%(text)s</textarea>
-      <br>
-      <br>
-      <input type="submit">
+    <!input name="text" value="%(text)s">
+    <textarea name="text" style="height: 100px; width: 400px;" >%(text)s</textarea>
+    <br>
+    <br>
+    <input type="submit">
 
 </form>
 
 """
 
+form_signup = """
+<form method="post">
+
+	<h2>Signup</h2>
+	<label> Username <input name="username" value="%(username)s"> </label>
+		<div style="color: red">%(wrong_username)s</div>
+	<label> Password <input type="password" name="password" value="%(password)s"> </label>
+		<div style="color: red">%(wrong_password)s</div>
+	<label> Verify Password <input type="password" name="verify" value="%(verify)s"> </label>
+		<div style="color: red">%(wrong_password_verify)s</div>
+	<label> Email(optional) <input name="email" value="%(email)s"> </label>
+		<div style="color: red">%(wrong_email_verify)s</div>
+	<input type="submit" value="log in"> 
+</form>
+"""
+
+form_success_login = """
+
+	<h2>Welcome, %(username)s</h2>
+
+"""
 
 class MainHandler(webapp2.RequestHandler):
 	def write_form(self, error="", month="", day="", year=""):
@@ -182,9 +205,77 @@ class Rot13Handler(webapp2.RequestHandler):
 		text = self.request.get("text")
 		self.write_form(text)
 
+class SignupHandler(webapp2.RequestHandler):
+	def valid_username(self, username):
+		USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+		return USER_RE.match(username)
+	
+	def valid_password(self, password):
+		PASSWORD_RE = re.compile(r"^.{3,20}$")
+		return PASSWORD_RE.match(password)
+
+	def valid_email(self, email):
+		EMAIL_RE = re.compile(r"(^[\S]+@[\S]+\.[\S]+$)")
+		return not email or EMAIL_RE.match(email)
+
+	def write_form(self, username="", wrong_username="", password="", wrong_password="", 
+					verify="", wrong_password_verify="", email="", wrong_email_verify=""):
+		self.response.write(form_signup % {
+					"username" : escape_html(username), "wrong_username" : wrong_username,
+					"password" : escape_html(password), "wrong_password" : wrong_password,
+					"verify" : escape_html(verify), "wrong_password_verify": wrong_password_verify,
+					"email" : escape_html(email), "wrong_email_verify": wrong_email_verify
+			})
+
+	def get(self):
+		self.write_form()
+
+	def post(self):
+		username = self.request.get("username")
+		password = self.request.get("password")
+		verify = self.request.get("verify")
+		email = self.request.get("email")
+
+		wrong_username = ""
+		wrong_password = ""
+		wrong_password_verify = ""
+		wrong_email_verify = ""
+
+		success = True
+
+		if not self.valid_username(username):
+			wrong_username = "That's not a valid username."
+			success = False
+		if not self.valid_password(password):
+			wrong_password = "That wasn't a valid password."
+			success = False
+		if password!="" and password!=verify:
+			wrong_password_verify = "Your passwords didn't match."
+			success = False
+		if email!="" and not self.valid_email(email):
+			wrong_email_verify = "That's not a valid email."
+			success = False
+
+		if not success:
+			self.write_form(username, wrong_username, password, wrong_password, 
+				verify, wrong_password_verify, email, wrong_email_verify)
+		else:
+			self.redirect('/welcome?username=' + username)
+
+class WelcomeHandler(webapp2.RequestHandler):
+	def get(self):
+		signupHandler = SignupHandler()
+		username = self.request.get('username')
+		if signupHandler.valid_username(username):
+			self.response.write(form_success_login % {"username" : username})
+		else:
+			self.redirect('signup')
+
 app = webapp2.WSGIApplication([
     ('/', MainHandler),
     ('/thanks', ThanksHandler), 
-    ('/rot13', Rot13Handler)
+    ('/rot13', Rot13Handler),
+    ('/signup', SignupHandler),
+    ('/welcome', WelcomeHandler)
 #    ('/testform', TestHandler)
 ], debug=True)
